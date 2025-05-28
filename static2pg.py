@@ -60,6 +60,7 @@ connection_params_static = {
 zone_query = "select id, name, type, range, point from public.zone where type in ('port','anchorage','checkpoint','canal')"
 berth_query = "select  id, name, type, port_id, range, point from public.berth"
 installation_query = "select  id, type, status, name, port_id, point from public.installation"
+match_install_berth_query = "select  id, installation_id, berth_id from public.match_installation_berth"
 
 # Create engine
 engine_pg = connect_to_pg(**connection_params_pg)
@@ -69,12 +70,18 @@ print (engine_static)
 
 
 # Read query into GeoDataFrame  and set WGS84 as CRS
+#zone
 gdf_zone = gpd.read_postgis(zone_query, con=engine_static, geom_col='point')
 gdf_zone.set_crs(epsg=4326, inplace=True)
+#Berth
 gdf_berth = gpd.read_postgis(berth_query, con=engine_static, geom_col='point')
 gdf_berth.set_crs(epsg=4326, inplace=True)
+#Installation
 gdf_installation= gpd.read_postgis(installation_query, con=engine_static, geom_col='point')
 gdf_installation.set_crs(epsg=4326, inplace=True)
+#match installation-berth
+df_match = pd.read_sql_query(match_install_berth_query, con=engine_static)
+
 
 # create column with circular geometry based on range field
 #ports, create the geodesic polygons
@@ -109,6 +116,7 @@ schema_name = "sandbox"
 table_Port = "st_ports"
 table_Berth = "st_berths"
 table_installations = 'st_installations'
+table_match = 'st_match_instal_berth'
 
 
 # Function to empty db
@@ -119,14 +127,16 @@ def empty_table(table_name):
 #Create or Replace the tables  to PostgreSQL
 ####Port
 empty_table(table_Port)
-
 gdf_zone.to_postgis(table_Port, engine_pg, schema=schema_name, if_exists="append", index=False, dtype={
         'polygon_geom': Geometry(geometry_type='POLYGON', srid=4326)
     })
 ####Berth
-empty_table(table_Berth)
-gdf_berth.to_postgis(table_Berth, engine_pg, schema=schema_name, if_exists="append", index=False)
+#empty_table(table_Berth)
+#gdf_berth.to_postgis(table_Berth, engine_pg, schema=schema_name, if_exists="append", index=False)
 ####Installations
 #empty_table(table_installations)
 #gdf_installation.to_postgis(table_installations, engine_pg, schema=schema_name, if_exists="append", index=False)
+####Match table
+#empty_table(table_installations)
+df_match.to_sql(table_match, engine_pg, schema=schema_name, if_exists="append", index=False)
 print("Tables successfully created/replaced in PostgreSQL!")
